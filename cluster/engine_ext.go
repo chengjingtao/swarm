@@ -37,3 +37,18 @@ func (e *Engine) UsedCpusWithoutStop() int64 {
 	e.RUnlock()
 	return r
 }
+
+// Containers returns all the containers in the engine.
+func (e *Engine) ContainersTotalAndStart() (total Containers, start Containers) {
+	e.RLock()
+	total = Containers{}
+	start = Containers{}
+	for _, container := range e.containers {
+		total = append(total, container)
+		if container.Info.State.Running {
+			start = append(start, container)
+		}
+	}
+	e.RUnlock()
+	return
+}

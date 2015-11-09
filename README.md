@@ -89,3 +89,11 @@ Code and documentation copyright 2014-2015 Docker, inc. Code released under the
 Apache 2.0 license.
 
 Docs released under Creative commons.
+
+
+
+-------
+
+./swarm --debug manage -H 0.0.0.0:4375 nodes://192.168.5.55:2375
+
+
