@@ -8,6 +8,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/filter"
 	"github.com/docker/swarm/scheduler/node"
+	_ "github.com/docker/swarm/scheduler/notify" //add  notify package
 	"github.com/docker/swarm/scheduler/strategy"
 )
 

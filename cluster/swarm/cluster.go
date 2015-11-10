@@ -154,6 +154,8 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	n := nodes[0]
 
 	log.Debugln("node -> %s  selected", n.Addr)
+	c.scheduler.Unlock()
+	return nil, errors.New("quit because  debug!!")
 
 	engine, ok := c.engines[n.ID]
 	if !ok {

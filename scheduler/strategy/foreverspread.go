@@ -1,10 +1,12 @@
 package strategy
 
 import (
+	"errors"
 	"sort"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/eventemitter"
 	"github.com/docker/swarm/scheduler/node"
 )
 
@@ -37,5 +39,16 @@ func (p *ForeverSpreadPlacementStrategy) RankAndSort(config *cluster.ContainerCo
 		output[i] = n.Node
 		log.Debugf("%d : %v , score : %d", i, n.Node.Addr, n.Weight)
 	}
+
+	if len(weightedNodes) == 0 {
+		return nil, errors.New("Impossible Happen. no nodes in cluster")
+	}
+
+	//说明最小的一个已经超过了200,即集群中 node的资源都已经使用完毕
+	if true || weightedNodes[0].Weight > 200 {
+		//evt:/cluster/resources/over, args: []*node.Node
+		eventemitter.Emit("/cluster/resources/over", output)
+	}
+
 	return output, nil
 }

@@ -15,8 +15,6 @@ func init() {
 //trigger one event
 func Emit(evt string, args interface{}) {
 	handlers, ok := evtHanlders[evt]
-	//fmt.Println(ok)
-	//fmt.Println(handlers)
 
 	if ok == false || len(handlers) == 0 {
 		return

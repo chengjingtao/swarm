@@ -22,23 +22,29 @@ type Node struct {
 	TotalCpus   int64
 
 	IsHealthy bool
+
+	Containers_Start cluster.Containers
 }
 
 // NewNode creates a node from an engine.
 func NewNode(e *cluster.Engine) *Node {
+
+	var _, start = e.ContainersTotalAndStart()
+
 	return &Node{
-		ID:          e.ID,
-		IP:          e.IP,
-		Addr:        e.Addr,
-		Name:        e.Name,
-		Labels:      e.Labels,
-		Containers:  e.Containers(),
-		Images:      e.Images(),
-		UsedMemory:  e.UsedMemoryWithoutStop(), //e.UsedMemory(),
-		UsedCpus:    e.UsedCpusWithoutStop(),   //e.UsedCpus(),
-		TotalMemory: e.TotalMemory(),
-		TotalCpus:   e.TotalCpus(),
-		IsHealthy:   e.IsHealthy(),
+		ID:               e.ID,
+		IP:               e.IP,
+		Addr:             e.Addr,
+		Name:             e.Name,
+		Labels:           e.Labels,
+		Containers:       e.Containers(),
+		Images:           e.Images(),
+		UsedMemory:       e.UsedMemoryWithoutStop(), //e.UsedMemory(),
+		UsedCpus:         e.UsedCpusWithoutStop(),   //e.UsedCpus(),
+		TotalMemory:      e.TotalMemory(),
+		TotalCpus:        e.TotalCpus(),
+		IsHealthy:        e.IsHealthy(),
+		Containers_Start: start,
 	}
 }
 
