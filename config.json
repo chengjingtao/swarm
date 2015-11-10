@@ -1,9 +1,9 @@
 {	
 	"notify":{
 		"email_host":"smtp.sina.com:25",
-		"email_pwd":"1qaz@WSX",
+		"email_pwd":"*******",
 		"email_user":"chengjtdebug@sina.com",
-		"email_to":"chengjt@csdn.net",
+		"email_to":"*****",
 		"email_interval":2,
 		"email_subject":"WEBIDE Docker 集群资源超限提醒"
 	}

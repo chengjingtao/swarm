@@ -19,9 +19,9 @@ var NotifyInterval time.Duration
 
 var (
 	email_user     = "chengjtdebug@sina.com"
-	email_pwd      = "1qaz@WSX"
+	email_pwd      = "*******"
 	email_host     = "smtp.sina.com:25"
-	email_to       = "chengjt@csdn.net"
+	email_to       = "*******"
 	email_subject  = "docker 集群资源超限提醒"
 	email_interval = 2
 )
