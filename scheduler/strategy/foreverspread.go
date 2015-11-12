@@ -45,7 +45,7 @@ func (p *ForeverSpreadPlacementStrategy) RankAndSort(config *cluster.ContainerCo
 	}
 
 	//说明最小的一个已经超过了200,即集群中 node的资源都已经使用完毕
-	if true || weightedNodes[0].Weight > 200 {
+	if weightedNodes[0].Weight > 200 {
 		//evt:/cluster/resources/over, args: []*node.Node
 		eventemitter.Emit("/cluster/resources/over", output)
 	}
