@@ -30,7 +30,7 @@ func init() {
 	m = new(sync.RWMutex)
 
 	eventemitter.On("/cluster/resources/over", resourceOver)
-	log.Debugln("register  /cluster/resources/over ")
+	log.Info("register /cluster/resources/over")
 	NotifyInterval = time.Duration(email_interval) * time.Hour
 
 	viper.SetConfigFile("config.json")
@@ -47,21 +47,26 @@ func init() {
 
 func setEmailArgs() {
 	if str := viper.GetString("notify.email_user"); str != "" {
+		log.Info("config.json:email_user ", str)
 		email_user = str
 	}
 	if str := viper.GetString("notify.email_host"); str != "" {
+		log.Info("config.json:email_host ", str)
 		email_host = str
 	}
 	if str := viper.GetString("notify.email_pwd"); str != "" {
 		email_pwd = str
 	}
 	if str := viper.GetString("notify.email_to"); str != "" {
+		log.Info("config.json:email_to ", str)
 		email_to = str
 	}
 	if str := viper.GetString("notify.email_subject"); str != "" {
+		log.Debugln("config.json:email_subject ", str)
 		email_subject = str
 	}
 	if v := viper.GetInt("notify.email_interval"); v != 0 {
+		log.Info("config.json:email_interval ", v)
 		email_interval = v
 	}
 }
@@ -69,7 +74,21 @@ func setEmailArgs() {
 func resourceOver(evt string, args interface{}) {
 	log.Info("/cluster/resources/over event ")
 
-	nodes, ok := args.([]*node.Node)
+	var array, isArray = args.([]interface{})
+	if isArray == false {
+		log.Warn("参数错误, 参数非数组.")
+		return
+	}
+
+	if len(array) != 2 {
+		log.Warn("参数错误, 参数个数不为2")
+		return
+	}
+
+	var nodesData = array[1]
+	var notifyType = fmt.Sprintf("%v", array[0])
+
+	nodes, ok := nodesData.([]*node.Node)
 	if ok == false {
 		log.Warn("/cluster/resources/over event, but args is not []*node.Node")
 		return
@@ -82,7 +101,7 @@ func resourceOver(evt string, args interface{}) {
 
 	m.Lock()
 
-	err := notify(nodes)
+	err := notify(notifyType, nodes)
 	if err != nil {
 		log.Info("/cluster/resources/over event , notify error ," + err.Error())
 
@@ -118,7 +137,7 @@ func isNeedToNotify() bool {
 	return false
 }
 
-func notify(nodes []*node.Node) error {
+func notify(notifytype string, nodes []*node.Node) error {
 
 	var data = "<ul>"
 
@@ -150,11 +169,11 @@ func notify(nodes []*node.Node) error {
 	body := fmt.Sprintf(`
 	<html>
 		<body>
-			<h2>docker 集群超限提醒</h2>
+			<h2>docker 集群超限提醒 (%s )  </h2>
 			%s
 		</body>
 	</html>
-	`, data)
+	`, notifytype, data)
 
 	log.Debugf("email_user : %s , email_host: %s , email_to: %s , email_subject : %s  ,email_interval: %d ", email_user, email_host, email_to, email_subject, email_interval)
 

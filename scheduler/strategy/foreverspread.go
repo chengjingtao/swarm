@@ -44,11 +44,51 @@ func (p *ForeverSpreadPlacementStrategy) RankAndSort(config *cluster.ContainerCo
 		return nil, errors.New("Impossible Happen. no nodes in cluster")
 	}
 
-	//说明最小的一个已经超过了200,即集群中 node的资源都已经使用完毕
-	if weightedNodes[0].Weight > 200 {
+	//暂时放在这个地方吧...
+	log.Debugln("NOTIFY JUDGE")
+	if notify := isNeedToNotify(config, nodes); notify != "" {
 		//evt:/cluster/resources/over, args: []*node.Node
-		eventemitter.Emit("/cluster/resources/over", output)
+		eventemitter.Emit("/cluster/resources/over", []interface{}{notify, output})
 	}
 
 	return output, nil
+}
+
+//是否需要提醒目前来看和调度没有耦合关系, 如果 需要提醒虽然意味这没有可用资源,但是并不代表 PlaceContainer失败,所以目前将两者分开.
+//如果要做在一起,那么就需要重构RankAndSort的含义,改造所有策略
+func isNeedToNotify(config *cluster.ContainerConfig, nodes []*node.Node) string {
+	var cpuOver = true
+	var memOver = true
+
+	for _, node := range nodes {
+		var willCpus = node.UsedCpus + config.CpuShares
+		var willMemory = node.UsedMemory + config.Memory
+
+		if willCpus < node.TotalCpus {
+			cpuOver = false //有一个没有超过
+		}
+
+		if willMemory < node.TotalMemory {
+			memOver = false
+		}
+
+		log.Debugf("NODE[%s] OVER= %v  CPU = %d / %d   Memory = %d / %d", node.Addr,
+			cpuOver || memOver,
+			willCpus, node.TotalCpus, willMemory, node.TotalMemory)
+
+	}
+
+	if cpuOver && memOver {
+		return "cpu && memory"
+	}
+
+	if cpuOver {
+		return "cpu"
+	}
+
+	if memOver {
+		return "memory"
+	}
+
+	return ""
 }
