@@ -2,13 +2,13 @@ package strategy
 
 import (
 	"errors"
-	log "github.com/Sirupsen/logrus"
+	_ "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
 )
 
 func weighAllNodes(config *cluster.ContainerConfig, nodes []*node.Node) (weightedNodeList, error) {
-	log.Debugln("=============forever-spread.weightAllNodes===========")
+	//log.Debugln("=============weightAllNodes===========")
 
 	weightedNodes := weightedNodeList{}
 
@@ -25,11 +25,11 @@ func weighAllNodes(config *cluster.ContainerConfig, nodes []*node.Node) (weighte
 			memoryScore = (item.UsedMemory + config.Memory) * 100 / item.TotalMemory
 		}
 
-		log.Debugf("node.Addr:%s ,  node.TotalCpus:%d , node.TotalMemory:%d ,   config.Cpu:%d   ,   config.Memory:%d  ,  usedMemory :%d ,  usedCpu: %d ,   CpuScore:%d  ,  MemoryScore:%d",
-			item.Addr, item.TotalCpus, item.TotalMemory, config.CpuShares, config.Memory,
-			item.UsedMemory+config.Memory, item.UsedCpus+config.CpuShares, cpuScore, memoryScore)
+		//log.Debugf("node.Addr:%s ,  node.TotalCpus:%d , node.TotalMemory:%d ,   config.Cpu:%d   ,   config.Memory:%d  ,  usedMemory :%d ,  usedCpu: %d ,   CpuScore:%d  ,  MemoryScore:%d",
+		//	item.Addr, item.TotalCpus, item.TotalMemory, config.CpuShares, config.Memory,
+		//	item.UsedMemory+config.Memory, item.UsedCpus+config.CpuShares, cpuScore, memoryScore)
 
-		return &weightedNode{Node: item, Weight: cpuScore + memoryScore}
+		return &weightedNode{Node: item, Weight: cpuScore + memoryScore, memoryScore: memoryScore, cpuScore: cpuScore}
 	}
 
 	for _, node := range nodes {

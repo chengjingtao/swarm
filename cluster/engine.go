@@ -78,6 +78,7 @@ type Engine struct {
 	eventHandler    EventHandler
 	healthy         bool
 	overcommitRatio int64
+	Weight          int //加入的服务器的权重 -1 表示 备用服务器
 }
 
 // NewEngine is exported

@@ -30,7 +30,9 @@ func createContainer(ID string, config *cluster.ContainerConfig) *cluster.Contai
 	return &cluster.Container{
 		Container: dockerclient.Container{Id: ID},
 		Config:    config,
-		Info:      dockerclient.ContainerInfo{Config: &config.ContainerConfig},
+		Info: dockerclient.ContainerInfo{Config: &config.ContainerConfig, State: &dockerclient.State{
+			Running: true,
+		}},
 	}
 }
 

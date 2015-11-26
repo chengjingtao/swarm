@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,8 +13,9 @@ import (
 
 // An Entry represents a swarm host.
 type Entry struct {
-	Host string
-	Port string
+	Host   string
+	Port   string
+	Weight int
 }
 
 // NewEntry creates a new entry.
@@ -22,7 +24,31 @@ func NewEntry(url string) (*Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Entry{host, port}, nil
+	var w = getWeight(url)
+	return &Entry{host, port, w}, nil
+}
+
+func getWeight(url string) int {
+	var segments = strings.Split(url, "/")
+	var index = -1
+	for i, item := range segments {
+		if item == "weight" {
+			index = i
+			break
+		}
+	}
+
+	if index == -1 {
+		return 0
+	}
+
+	var value = segments[index+1]
+	var v, err = strconv.Atoi(value)
+	if err != nil {
+		log.Warn("weight 值有无, 将使用默认值0")
+		return 0
+	}
+	return v
 }
 
 // String returns the string form of an entry.
@@ -93,6 +119,7 @@ type Discovery interface {
 	Watch(stopCh <-chan struct{}) (<-chan Entries, <-chan error)
 
 	// Register to the discovery
+
 	Register(string) error
 }
 

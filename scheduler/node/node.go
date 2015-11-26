@@ -24,6 +24,7 @@ type Node struct {
 	IsHealthy bool
 
 	Containers_Start cluster.Containers
+	JoinWeight       int //  weight  of join the cluster
 }
 
 // NewNode creates a node from an engine.
@@ -45,6 +46,7 @@ func NewNode(e *cluster.Engine) *Node {
 		TotalCpus:        e.TotalCpus(),
 		IsHealthy:        e.IsHealthy(),
 		Containers_Start: start,
+		JoinWeight:       e.Weight,
 	}
 }
 
@@ -65,5 +67,22 @@ func (n *Node) AddContainer(container *cluster.Container) error {
 		n.UsedCpus = n.UsedCpus + cpus
 	}
 	n.Containers = append(n.Containers, container)
+	return nil
+}
+
+// AddContainer injects a container into the internal state.
+func (n *Node) RemoveContainer(id string) error {
+	var newContainers = cluster.Containers{}
+
+	for _, c := range n.Containers {
+		if c.Id != id {
+			newContainers = append(newContainers, c)
+		} else {
+			n.UsedMemory = n.UsedMemory - c.Config.Memory
+			n.UsedCpus = n.UsedCpus - c.Config.CpuShares
+		}
+	}
+
+	n.Containers = newContainers
 	return nil
 }

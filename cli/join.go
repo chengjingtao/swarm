@@ -14,6 +14,9 @@ func checkAddrFormat(addr string) bool {
 	return m
 }
 
+//join  --addr 172.16.150.11:2375 --weight -1    172.16.150.11:2375/weight/-1
+//join  --addr 172.16.150.11:2375
+
 func join(c *cli.Context) {
 	dflag := getDiscovery(c)
 	if dflag == "" {
@@ -50,9 +53,11 @@ func join(c *cli.Context) {
 
 	for {
 		log.WithFields(log.Fields{"addr": addr, "discovery": dflag}).Infof("Registering on the discovery service every %s...", hb)
+
 		if err := d.Register(addr); err != nil {
 			log.Error(err)
 		}
+
 		time.Sleep(hb)
 	}
 }

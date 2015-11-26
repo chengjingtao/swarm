@@ -208,6 +208,50 @@ func (c *Cluster) hasEngineByAddr(addr string) bool {
 	return c.getEngineByAddr(addr) != nil
 }
 
+//add engine to cluster with weight
+func (c *Cluster) addEngineW(addr string, weight int) bool {
+	log.Debugf("addEngine(%s,%d)", add, weight)
+	// Check the engine is already registered by address.
+	if c.hasEngineByAddr(addr) {
+		return false
+	}
+
+	engine := cluster.NewEngine(addr, c.overcommitRatio)
+	log.Debugf("NewEngine engine id is  %s", engine.ID)
+	if err := engine.RegisterEventHandler(c); err != nil {
+		log.Error(err)
+	}
+
+	// Attempt a connection to the engine. Since this is slow, don't get a hold
+	// of the lock yet.
+	if err := engine.Connect(c.TLSConfig); err != nil {
+		log.Error(err)
+		return false
+	}
+	log.Debugf("after  Connect,  engine id is  %s", engine.ID)
+	// The following is critical and fast. Grab a lock.
+	c.Lock()
+	defer c.Unlock()
+
+	// Make sure the engine ID is unique.
+	if old, exists := c.engines[engine.ID]; exists {
+		if old.Addr != engine.Addr {
+			log.Errorf("ID duplicated. %s shared by %s and %s", engine.ID, old.Addr, engine.Addr)
+		} else {
+			log.Debugf("node %q (name: %q) with address %q is already registered", engine.ID, engine.Name, engine.Addr)
+		}
+		engine.Disconnect()
+		return false
+	}
+
+	// Finally register the engine.
+	engine.Weight = weight
+	c.engines[engine.ID] = engine
+	log.Infof("Registered Engine %s at %s , weight is %d", engine.Name, addr, engine.Weight)
+	return true
+
+}
+
 func (c *Cluster) addEngine(addr string) bool {
 	// Check the engine is already registered by address.
 	if c.hasEngineByAddr(addr) {
@@ -281,7 +325,7 @@ func (c *Cluster) monitorDiscovery(ch <-chan discovery.Entries, errCh <-chan err
 			// Since `addEngine` can be very slow (it has to connect to the
 			// engine), we are going to do the adds in parallel.
 			for _, entry := range added {
-				go c.addEngine(entry.String())
+				go c.addEngineW(entry.String(), entry.Weight)
 			}
 		case err := <-errCh:
 			log.Errorf("Discovery error: %v", err)

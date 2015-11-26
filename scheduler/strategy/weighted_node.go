@@ -1,7 +1,7 @@
 package strategy
 
 import (
-	log "github.com/Sirupsen/logrus"
+	_ "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
 )
@@ -11,7 +11,17 @@ import (
 type weightedNode struct {
 	Node *node.Node
 	// Weight is the inherent value of this node.
-	Weight int64
+	Weight      int64
+	memoryScore int64
+	cpuScore    int64
+}
+
+func (n *weightedNode) MemoryLoad() float32 {
+	return float32(n.memoryScore) / 100
+}
+
+func (n *weightedNode) CpuLoad() float32 {
+	return float32(n.cpuScore) / 100
 }
 
 type weightedNodeList []*weightedNode
@@ -39,7 +49,7 @@ func (n weightedNodeList) Less(i, j int) bool {
 
 func weighNodes(config *cluster.ContainerConfig, nodes []*node.Node) (weightedNodeList, error) {
 	weightedNodes := weightedNodeList{}
-	log.Debugln("==================spread.weighNodes===============")
+	//log.Debugln("==================spread.weighNodes===============")
 
 	for _, node := range nodes {
 		nodeMemory := node.TotalMemory
@@ -63,11 +73,11 @@ func weighNodes(config *cluster.ContainerConfig, nodes []*node.Node) (weightedNo
 		}
 
 		if cpuScore <= 100 && memoryScore <= 100 {
-			weightedNodes = append(weightedNodes, &weightedNode{Node: node, Weight: cpuScore + memoryScore})
+			weightedNodes = append(weightedNodes, &weightedNode{Node: node, Weight: cpuScore + memoryScore, memoryScore: memoryScore, cpuScore: cpuScore})
 		}
 
-		log.Debugf("node.Addr:%s ,  node.TotalCpus:%d , node.TotalMemory:%d ,   config.Cpu:%d   ,   config.Memory:%d  ,   CpuScore:%d  ,  MemoryScore:%d",
-			node.Addr, node.TotalCpus, node.TotalMemory, config.CpuShares, config.Memory, cpuScore, memoryScore)
+		//log.Debugf("node.Addr:%s ,  node.TotalCpus:%d , node.TotalMemory:%d ,   config.Cpu:%d   ,   config.Memory:%d  ,   CpuScore:%d  ,  MemoryScore:%d",
+		//	node.Addr, node.TotalCpus, node.TotalMemory, config.CpuShares, config.Memory, cpuScore, memoryScore)
 	}
 
 	if len(weightedNodes) == 0 {

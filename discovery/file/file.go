@@ -107,3 +107,7 @@ func (s *Discovery) Watch(stopCh <-chan struct{}) (<-chan discovery.Entries, <-c
 func (s *Discovery) Register(addr string) error {
 	return discovery.ErrNotImplemented
 }
+
+func (s *Discovery) RegsiterB(addr string, isBk bool) error {
+	return discovery.ErrNotImplemented
+}
