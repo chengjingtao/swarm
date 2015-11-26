@@ -210,7 +210,7 @@ func (c *Cluster) hasEngineByAddr(addr string) bool {
 
 //add engine to cluster with weight
 func (c *Cluster) addEngineW(addr string, weight int) bool {
-	log.Debugf("addEngine(%s,%d)", add, weight)
+	log.Debugf("addEngine(%s,%d)", addr, weight)
 	// Check the engine is already registered by address.
 	if c.hasEngineByAddr(addr) {
 		return false
