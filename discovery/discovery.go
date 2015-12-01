@@ -20,15 +20,21 @@ type Entry struct {
 
 // NewEntry creates a new entry.
 func NewEntry(url string) (*Entry, error) {
-	host, port, err := net.SplitHostPort(url)
+
+	//	host, port, err := net.SplitHostPort(url)
+	//	log.Debugf("NewEntry() host is %s ,port is %s", host, port)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	var host, port, w, err = getHostAndPortAndWeight(url)
+	//log.Debugf("NewEntry() host is %s ,port is %s", host, port)
 	if err != nil {
 		return nil, err
 	}
-	var w = getWeight(url)
 	return &Entry{host, port, w}, nil
 }
 
-func getWeight(url string) int {
+func getHostAndPortAndWeight(url string) (host string, port string, w int, ers error) {
 	var segments = strings.Split(url, "/")
 	var index = -1
 	for i, item := range segments {
@@ -38,17 +44,25 @@ func getWeight(url string) int {
 		}
 	}
 
+	var hostAndPort = segments[0]
+	host, port, err := net.SplitHostPort(hostAndPort)
+
+	if err != nil {
+		return "", "", 0, err
+	}
+
 	if index == -1 {
-		return 0
+		return host, port, 0, nil
 	}
 
 	var value = segments[index+1]
-	var v, err = strconv.Atoi(value)
+	v, err := strconv.Atoi(value)
 	if err != nil {
 		log.Warn("weight 值有无, 将使用默认值0")
-		return 0
+		return host, port, 0, nil
 	}
-	return v
+
+	return host, port, v, nil
 }
 
 // String returns the string form of an entry.

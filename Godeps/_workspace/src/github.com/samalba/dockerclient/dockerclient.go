@@ -905,3 +905,31 @@ func (client *DockerClient) RemoveNetwork(id string) error {
 	_, err := client.doRequest("DELETE", uri, nil, nil)
 	return err
 }
+
+func (client *DockerClient) Commit(id string, c *ContainerConfig, repo, tag, comment, author string, pause bool) (string, error) {
+	config, err := json.Marshal(c)
+	if err != nil {
+		return "", err
+	}
+
+	v := url.Values{}
+	v.Set("container", id)
+	v.Set("repo", repo)
+	v.Set("tag", tag)
+	v.Set("comment", comment)
+	v.Set("author", author)
+	v.Set("pause", fmt.Sprintf("%b", pause))
+
+	uri := fmt.Sprintf("/%s/commit?%s", APIVersion, v.Encode())
+	data, err := client.doRequest("POST", uri, config, nil)
+	if err != nil {
+		return "", err
+	}
+
+	var img Image
+	if err := json.Unmarshal(data, &img); err != nil {
+		return "", err
+	}
+
+	return img.Id, nil
+}

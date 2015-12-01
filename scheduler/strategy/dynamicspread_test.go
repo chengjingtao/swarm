@@ -22,14 +22,6 @@ func TestName(t *testing.T) {
 	assert.Equal(t, name, "dynamic-spread")
 }
 
-func TestErr(t *testing.T) {
-	e := err(false)
-	assert.NoError(t, e)
-
-	e = err(true)
-	assert.NoError(t, e)
-}
-
 func err(has bool) error {
 	if has {
 		return errors.New("!!!")
@@ -40,6 +32,19 @@ func err(has bool) error {
 
 func createConfig2(memory int64, cpus int64) *cluster.ContainerConfig {
 	return cluster.BuildContainerConfig(dockerclient.ContainerConfig{Memory: memory * 1024 * 1024, CpuShares: cpus})
+}
+
+func TestRankAndSort2(t *testing.T) {
+	var d = &DynamicSpreadPlacementStrategy{}
+
+	var node1 = createNode("001", 4, 4)
+	node1.JoinWeight = -1
+	var nodes = []*node.Node{
+		node1,
+	}
+	var config256 = createConfig2(256, 0)
+	var _, err = d.RankAndSort(config256, nodes)
+	assert.EqualError(t, NoHaveCustomNodes, err.Error())
 }
 
 func TestRankAndSort(t *testing.T) {

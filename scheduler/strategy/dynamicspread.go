@@ -11,6 +11,10 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 )
 
+var (
+	NoHaveCustomNodes = errors.New("常备节点为空,无法调度.")
+)
+
 // SpreadPlacementStrategy places a container on the node with the fewest running containers.
 type DynamicSpreadPlacementStrategy struct {
 }
@@ -65,7 +69,7 @@ func (p *DynamicSpreadPlacementStrategy) RankAndSort(config *cluster.ContainerCo
 	}
 
 	if len(notBackupNodeList) <= 0 {
-		return nil, errors.New("常备节点为空,无法调度.")
+		return nil, NoHaveCustomNodes
 	}
 
 	var avgMemLoad = memoryLoad / float32(len(notBackupNodeList))

@@ -5,5 +5,5 @@ var (
 	VERSION = "1.0.0"
 
 	// GITCOMMIT will be overwritten automatically by the build system
-	GITCOMMIT = "HEAD"
+	GITCOMMIT = "54ad1f5"
 )

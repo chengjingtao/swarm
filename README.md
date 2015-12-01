@@ -96,6 +96,7 @@ Docs released under Creative commons.
 
 ./swarm --debug manage -H 0.0.0.0:4375 nodes://192.168.5.55:2375
 ./swarm --debug manage -H 0.0.0.0:4375 --strategy forever-spread  nodes://192.168.5.55:2375
+./swarm --debug manage -H 0.0.0.0:4375 --strategy dynamic-spread  nodes://192.168.5.55:2375
 docker run -v XXXX/config.json:config.json swarm 
 
 
