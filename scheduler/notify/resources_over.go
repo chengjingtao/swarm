@@ -151,13 +151,18 @@ func notify(notifytype string, nodes []*node.Node) error {
 		data += "<li><table><tr><th>Id</th><th>Name</th><th>Image</th><th>CpuShares</th><th>Memory</th><th>State</th></tr>"
 
 		for _, c := range n.Containers {
+			var state = "-"
+			if c.Info.State != nil {
+				state = c.Info.State.StateString()
+			}
+
 			data += "<tr>"
 			data += "<td>" + c.Container.Id + "</td>"
 			data += "<td>" + strings.Join(c.Container.Names, ",") + "</td>"
 			data += "<td>" + c.Container.Image + "</td>"
 			data += "<td>" + fmt.Sprintf("%d", c.Config.CpuShares) + "</td>"
 			data += "<td>" + fmt.Sprintf("%.2f Mb", float64(c.Config.Memory)/1024/1024) + "</td>"
-			data += "<td>" + c.Info.State.StateString() + "</td>"
+			data += "<td>" + state + "</td>"
 			data += "</tr>"
 		}
 
