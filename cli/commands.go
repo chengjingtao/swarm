@@ -26,6 +26,7 @@ var (
 				flHosts,
 				flLeaderElection, flLeaderTTL, flManageAdvertise,
 				flTLS, flTLSCaCert, flTLSCert, flTLSKey, flTLSVerify,
+				flRefreshIntervalMin, flRefreshIntervalMax, flFailureRetry, flRefreshRetry,
 				flHeartBeat,
 				flEnableCors,
 				flCluster, flDiscoveryOpt, flClusterOpt},
@@ -34,8 +35,8 @@ var (
 		{
 			Name:      "join",
 			ShortName: "j",
-			Usage:     "join a docker cluster",
-			Flags:     []cli.Flag{flJoinAdvertise, flHeartBeat, flTTL, flDiscoveryOpt},
+			Usage:     "Join a docker cluster",
+			Flags:     []cli.Flag{flJoinAdvertise, flHeartBeat, flTTL, flJoinRandomDelay, flDiscoveryOpt},
 			Action:    join,
 		},
 	}

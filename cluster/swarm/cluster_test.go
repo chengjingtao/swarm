@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"io"
 	"testing"
+	"time"
 
+	"github.com/docker/engine-api/types"
+	engineapimock "github.com/docker/swarm/api/mockclient"
 	"github.com/docker/swarm/cluster"
 	"github.com/samalba/dockerclient"
 	"github.com/samalba/dockerclient/mockclient"
@@ -23,8 +26,8 @@ func (nopCloser) Close() error {
 }
 
 var (
-	mockInfo = &dockerclient.Info{
-		ID:              "id",
+	mockInfo = types.Info{
+		ID:              "test-engine",
 		Name:            "name",
 		NCPU:            10,
 		MemTotal:        20,
@@ -35,13 +38,19 @@ var (
 		Labels:          []string{"foo=bar"},
 	}
 
-	mockVersion = &dockerclient.Version{
+	mockVersion = types.Version{
 		Version: "1.6.2",
+	}
+
+	engOpts = &cluster.EngineOpts{
+		RefreshMinInterval: time.Duration(30) * time.Second,
+		RefreshMaxInterval: time.Duration(60) * time.Second,
+		FailureRetry:       3,
 	}
 )
 
 func createEngine(t *testing.T, ID string, containers ...*cluster.Container) *cluster.Engine {
-	engine := cluster.NewEngine(ID, 0)
+	engine := cluster.NewEngine(ID, 0, engOpts)
 	engine.Name = ID
 	engine.ID = ID
 
@@ -119,22 +128,25 @@ func TestImportImage(t *testing.T) {
 
 	// create engione
 	id := "test-engine"
-	engine := cluster.NewEngine(id, 0)
+	engine := cluster.NewEngine(id, 0, engOpts)
 	engine.Name = id
 	engine.ID = id
 
 	// create mock client
 	client := mockclient.NewMockClient()
-	client.On("Info").Return(mockInfo, nil)
-	client.On("Version").Return(mockVersion, nil)
+	apiClient := engineapimock.NewMockClient()
+	apiClient.On("Info", mock.Anything).Return(mockInfo, nil)
+	apiClient.On("ServerVersion", mock.Anything).Return(mockVersion, nil)
+	apiClient.On("NetworkList", mock.Anything,
+		mock.AnythingOfType("NetworkListOptions"),
+	).Return([]types.NetworkResource{}, nil)
+	apiClient.On("VolumeList", mock.Anything, mock.Anything).Return(types.VolumesListResponse{}, nil)
 	client.On("StartMonitorEvents", mock.Anything, mock.Anything, mock.Anything).Return()
 	client.On("ListContainers", true, false, "").Return([]dockerclient.Container{}, nil).Once()
-	client.On("ListImages", mock.Anything).Return([]*dockerclient.Image{}, nil)
-	client.On("ListVolumes", mock.Anything).Return([]*dockerclient.Volume{}, nil)
-	client.On("ListNetworks", mock.Anything).Return([]*dockerclient.NetworkResource{}, nil)
+	apiClient.On("ImageList", mock.Anything, mock.AnythingOfType("ImageListOptions")).Return([]types.Image{}, nil)
 
 	// connect client
-	engine.ConnectWithClient(client)
+	engine.ConnectWithClient(client, apiClient)
 
 	// add engine to cluster
 	c.engines[engine.ID] = engine
@@ -169,22 +181,25 @@ func TestLoadImage(t *testing.T) {
 
 	// create engione
 	id := "test-engine"
-	engine := cluster.NewEngine(id, 0)
+	engine := cluster.NewEngine(id, 0, engOpts)
 	engine.Name = id
 	engine.ID = id
 
 	// create mock client
 	client := mockclient.NewMockClient()
-	client.On("Info").Return(mockInfo, nil)
-	client.On("Version").Return(mockVersion, nil)
+	apiClient := engineapimock.NewMockClient()
+	apiClient.On("Info", mock.Anything).Return(mockInfo, nil)
+	apiClient.On("ServerVersion", mock.Anything).Return(mockVersion, nil)
+	apiClient.On("NetworkList", mock.Anything,
+		mock.AnythingOfType("NetworkListOptions"),
+	).Return([]types.NetworkResource{}, nil)
+	apiClient.On("VolumeList", mock.Anything, mock.Anything).Return(types.VolumesListResponse{}, nil)
 	client.On("StartMonitorEvents", mock.Anything, mock.Anything, mock.Anything).Return()
 	client.On("ListContainers", true, false, "").Return([]dockerclient.Container{}, nil).Once()
-	client.On("ListImages", mock.Anything).Return([]*dockerclient.Image{}, nil)
-	client.On("ListVolumes", mock.Anything).Return([]*dockerclient.Volume{}, nil)
-	client.On("ListNetworks", mock.Anything).Return([]*dockerclient.NetworkResource{}, nil)
+	apiClient.On("ImageList", mock.Anything, mock.AnythingOfType("ImageListOptions")).Return([]types.Image{}, nil)
 
 	// connect client
-	engine.ConnectWithClient(client)
+	engine.ConnectWithClient(client, apiClient)
 
 	// add engine to cluster
 	c.engines[engine.ID] = engine
@@ -212,32 +227,35 @@ func TestTagImage(t *testing.T) {
 	c := &Cluster{
 		engines: make(map[string]*cluster.Engine),
 	}
-	images := []*dockerclient.Image{}
+	images := []types.Image{}
 
-	image1 := &dockerclient.Image{
-		Id:       "1234567890",
+	image1 := types.Image{
+		ID:       "1234567890",
 		RepoTags: []string{"busybox:latest"},
 	}
 	images = append(images, image1)
 
 	// create engine
 	id := "test-engine"
-	engine := cluster.NewEngine(id, 0)
+	engine := cluster.NewEngine(id, 0, engOpts)
 	engine.Name = id
 	engine.ID = id
 
 	// create mock client
 	client := mockclient.NewMockClient()
-	client.On("Info").Return(mockInfo, nil)
-	client.On("Version").Return(mockVersion, nil)
+	apiClient := engineapimock.NewMockClient()
+	apiClient.On("Info", mock.Anything).Return(mockInfo, nil)
+	apiClient.On("ServerVersion", mock.Anything).Return(mockVersion, nil)
+	apiClient.On("NetworkList", mock.Anything,
+		mock.AnythingOfType("NetworkListOptions"),
+	).Return([]types.NetworkResource{}, nil)
+	apiClient.On("VolumeList", mock.Anything, mock.Anything).Return(types.VolumesListResponse{}, nil)
 	client.On("StartMonitorEvents", mock.Anything, mock.Anything, mock.Anything).Return()
 	client.On("ListContainers", true, false, "").Return([]dockerclient.Container{}, nil).Once()
-	client.On("ListImages", mock.Anything).Return(images, nil)
-	client.On("ListVolumes", mock.Anything).Return([]*dockerclient.Volume{}, nil)
-	client.On("ListNetworks", mock.Anything).Return([]*dockerclient.NetworkResource{}, nil)
+	apiClient.On("ImageList", mock.Anything, mock.AnythingOfType("ImageListOptions")).Return(images, nil)
 
 	// connect client
-	engine.ConnectWithClient(client)
+	engine.ConnectWithClient(client, apiClient)
 
 	// add engine to cluster
 	c.engines[engine.ID] = engine

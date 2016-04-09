@@ -32,14 +32,18 @@ function teardown() {
 	swarm_manage
 
 	# run
-	docker_swarm run -d -v=/tmp busybox true
+	docker_swarm run -d -v=/tmp -e constraint:node==node-0 busybox true
 
 	run docker_swarm volume ls -q
 	[ "${#lines[@]}" -eq 1 ]
+	[[ "${output}" == *"node-0/"* ]]
 
-	run docker_swarm volume inspect ${output}
-	[ "${#lines[@]}" -eq 7 ]
+	id=${output}
+
+	run docker_swarm volume inspect $id
 	[[ "${output}" == *"\"Driver\": \"local\""* ]]
+
+	diff <(docker_swarm volume inspect $id) <(docker -H ${HOSTS[0]} volume inspect ${id#node-0/})
 }
 
 @test "docker volume create" {
@@ -56,6 +60,13 @@ function teardown() {
 	docker_swarm run -d -v=/tmp busybox true
 	run docker_swarm volume ls
 	[ "${#lines[@]}" -eq 4 ]
+
+	run docker_swarm volume create --name=node-2/test_volume2
+	[ "$status" -ne 0 ]
+
+	docker_swarm volume create --name=node-0/test_volume2
+	run docker_swarm volume ls
+	[ "${#lines[@]}" -eq 5 ]
 }
 
 @test "docker volume rm" {

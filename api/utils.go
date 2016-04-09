@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
@@ -53,20 +54,18 @@ func sendErrorJSONMessage(w io.Writer, errorCode int, errorMessage string) {
 
 	json.NewEncoder(w).Encode(message)
 }
-func newClientAndScheme(tlsConfig *tls.Config) (*http.Client, string) {
-	if tlsConfig != nil {
-		return &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}, "https"
-	}
-	return &http.Client{}, "http"
-}
 
 func getContainerFromVars(c *context, vars map[string]string) (string, *cluster.Container, error) {
 	if name, ok := vars["name"]; ok {
 		if container := c.cluster.Container(name); container != nil {
+			if !container.Engine.IsHealthy() {
+				return name, container, fmt.Errorf("Container %s running on unhealthy node %s", name, container.Engine.Name)
+			}
 			return name, container, nil
 		}
 		return name, nil, fmt.Errorf("No such container: %s", name)
 	}
+
 	if ID, ok := vars["execid"]; ok {
 		for _, container := range c.cluster.Containers() {
 			for _, execID := range container.Info.ExecIDs {
@@ -77,6 +76,7 @@ func getContainerFromVars(c *context, vars map[string]string) (string, *cluster.
 		}
 		return "", nil, fmt.Errorf("Exec %s not found", ID)
 	}
+
 	return "", nil, errors.New("Not found")
 }
 
@@ -89,21 +89,18 @@ func copyHeader(dst, src http.Header) {
 	}
 }
 
-// prevents leak with https
-func closeIdleConnections(client *http.Client) {
-	if tr, ok := client.Transport.(*http.Transport); ok {
-		tr.CloseIdleConnections()
-	}
-}
-
-func proxyAsync(tlsConfig *tls.Config, addr string, w http.ResponseWriter, r *http.Request, callback func(*http.Response)) error {
-	// Use a new client for each request
-	client, scheme := newClientAndScheme(tlsConfig)
+func proxyAsync(engine *cluster.Engine, w http.ResponseWriter, r *http.Request, callback func(*http.Response)) error {
 	// RequestURI may not be sent to client
 	r.RequestURI = ""
 
+	client, scheme, err := engine.HTTPClientAndScheme()
+
+	if err != nil {
+		return err
+	}
+
 	r.URL.Scheme = scheme
-	r.URL.Host = addr
+	r.URL.Host = engine.Addr
 
 	log.WithFields(log.Fields{"method": r.Method, "url": r.URL}).Debug("Proxy request")
 	resp, err := client.Do(r)
@@ -121,13 +118,114 @@ func proxyAsync(tlsConfig *tls.Config, addr string, w http.ResponseWriter, r *ht
 
 	// cleanup
 	resp.Body.Close()
-	closeIdleConnections(client)
 
 	return nil
 }
 
-func proxy(tlsConfig *tls.Config, addr string, w http.ResponseWriter, r *http.Request) error {
-	return proxyAsync(tlsConfig, addr, w, r, nil)
+func proxy(engine *cluster.Engine, w http.ResponseWriter, r *http.Request) error {
+	return proxyAsync(engine, w, r, nil)
+}
+
+type tlsClientConn struct {
+	*tls.Conn
+	rawConn net.Conn
+}
+
+func (c *tlsClientConn) CloseWrite() error {
+	// Go standard tls.Conn doesn't provide the CloseWrite() method so we do it
+	// on its underlying connection.
+	if cwc, ok := c.rawConn.(interface {
+		CloseWrite() error
+	}); ok {
+		log.Debug("Calling CloseWrite on Hijacked TLS Conn")
+		return cwc.CloseWrite()
+	}
+	return nil
+}
+
+// We need to copy Go's implementation of tls.Dial (pkg/cryptor/tls/tls.go) in
+// order to return our custom tlsClientCon struct which holds both the tls.Conn
+// object _and_ its underlying raw connection. The rationale for this is that
+// we need to be able to close the write end of the connection when attaching,
+// which tls.Conn does not provide.
+func tlsDialWithDialer(dialer *net.Dialer, network, addr string, config *tls.Config) (net.Conn, error) {
+	// We want the Timeout and Deadline values from dialer to cover the
+	// whole process: TCP connection and TLS handshake. This means that we
+	// also need to start our own timers now.
+	timeout := dialer.Timeout
+
+	if !dialer.Deadline.IsZero() {
+		deadlineTimeout := dialer.Deadline.Sub(time.Now())
+		if timeout == 0 || deadlineTimeout < timeout {
+			timeout = deadlineTimeout
+		}
+	}
+
+	var errChannel chan error
+
+	if timeout != 0 {
+		errChannel = make(chan error, 2)
+		time.AfterFunc(timeout, func() {
+			errChannel <- errors.New("")
+		})
+	}
+
+	rawConn, err := dialer.Dial(network, addr)
+	if err != nil {
+		return nil, err
+	}
+	// When we set up a TCP connection for hijack, there could be long periods
+	// of inactivity (a long running command with no output) that in certain
+	// network setups may cause ECONNTIMEOUT, leaving the client in an unknown
+	// state. Setting TCP KeepAlive on the socket connection will prohibit
+	// ECONNTIMEOUT unless the socket connection truly is broken
+	if tcpConn, ok := rawConn.(*net.TCPConn); ok {
+		tcpConn.SetKeepAlive(true)
+		tcpConn.SetKeepAlivePeriod(30 * time.Second)
+	}
+
+	colonPos := strings.LastIndex(addr, ":")
+	if colonPos == -1 {
+		colonPos = len(addr)
+	}
+	hostname := addr[:colonPos]
+
+	// If no ServerName is set, infer the ServerName
+	// from the hostname we're connecting to.
+	if config.ServerName == "" {
+		// Make a copy to avoid polluting argument or default.
+		c := *config
+		c.ServerName = hostname
+		config = &c
+	}
+
+	conn := tls.Client(rawConn, config)
+
+	if timeout == 0 {
+		err = conn.Handshake()
+	} else {
+		go func() {
+			errChannel <- conn.Handshake()
+		}()
+
+		err = <-errChannel
+	}
+
+	if err != nil {
+		rawConn.Close()
+		return nil, err
+	}
+
+	// This is Docker difference with standard's crypto/tls package: returned a
+	// wrapper which holds both the TLS and raw connections.
+	return &tlsClientConn{conn, rawConn}, nil
+}
+
+func dialHijack(tlsConfig *tls.Config, addr string) (net.Conn, error) {
+	if tlsConfig == nil {
+		return net.Dial("tcp", addr)
+	}
+	return tlsDialWithDialer(new(net.Dialer), "tcp", addr, tlsConfig)
 }
 
 func hijack(tlsConfig *tls.Config, addr string, w http.ResponseWriter, r *http.Request) error {
@@ -142,11 +240,7 @@ func hijack(tlsConfig *tls.Config, addr string, w http.ResponseWriter, r *http.R
 		err error
 	)
 
-	if tlsConfig != nil {
-		d, err = tls.Dial("tcp", addr, tlsConfig)
-	} else {
-		d, err = net.Dial("tcp", addr)
-	}
+	d, err = dialHijack(tlsConfig, addr)
 	if err != nil {
 		return err
 	}
@@ -218,4 +312,8 @@ func int64ValueOrZero(r *http.Request, k string) int64 {
 		return 0
 	}
 	return val
+}
+
+func tagHasDigest(tag string) bool {
+	return strings.Contains(tag, ":")
 }

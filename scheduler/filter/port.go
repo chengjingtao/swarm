@@ -20,7 +20,7 @@ func (p *PortFilter) Name() string {
 }
 
 // Filter is exported
-func (p *PortFilter) Filter(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error) {
+func (p *PortFilter) Filter(config *cluster.ContainerConfig, nodes []*node.Node, _ bool) ([]*node.Node, error) {
 	if config.HostConfig.NetworkMode == "host" {
 		return p.filterHost(config, nodes)
 	}
@@ -117,6 +117,24 @@ func (p *PortFilter) compare(requested dockerclient.PortBinding, bindings map[st
 		}
 	}
 	return false
+}
+
+// GetFilters returns a list of the port constraints found in the container config.
+func (p *PortFilter) GetFilters(config *cluster.ContainerConfig) ([]string, error) {
+	allPortConstraints := []string{}
+	if config.HostConfig.NetworkMode == "host" {
+		for port := range config.ExposedPorts {
+			allPortConstraints = append(allPortConstraints, fmt.Sprintf("port %s (Host mode)", port))
+		}
+		return allPortConstraints, nil
+	}
+
+	for _, port := range config.HostConfig.PortBindings {
+		for _, binding := range port {
+			allPortConstraints = append(allPortConstraints, fmt.Sprintf("port %s (Bridge mode)", binding.HostPort))
+		}
+	}
+	return allPortConstraints, nil
 }
 
 func bindsAllInterfaces(binding dockerclient.PortBinding) bool {

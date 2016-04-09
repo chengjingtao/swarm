@@ -3,6 +3,7 @@ package filter
 import (
 	"testing"
 
+	"github.com/docker/engine-api/types"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/samalba/dockerclient"
@@ -26,11 +27,11 @@ func TestApplyFilters(t *testing.T) {
 						Names: []string{"/container-n0-1-name"},
 					}},
 				},
-				Images: []*cluster.Image{{Image: dockerclient.Image{
-					Id:       "image-0-id",
+				Images: []*cluster.Image{{Image: types.Image{
+					ID:       "image-0-id",
 					RepoTags: []string{"image-0:tag1", "image-0:tag2"},
 				}}},
-				IsHealthy: true,
+				HealthIndicator: 100,
 			},
 			{
 				ID:   "node-1-id",
@@ -50,11 +51,11 @@ func TestApplyFilters(t *testing.T) {
 						},
 					},
 				},
-				Images: []*cluster.Image{{Image: dockerclient.Image{
-					Id:       "image-1-id",
+				Images: []*cluster.Image{{Image: types.Image{
+					ID:       "image-1-id",
 					RepoTags: []string{"image-1:tag1", "image-0:tag3", "image-1:tag2"},
 				}}},
-				IsHealthy: false,
+				HealthIndicator: 0,
 			},
 		}
 		result []*node.Node
@@ -63,7 +64,10 @@ func TestApplyFilters(t *testing.T) {
 
 	//Tests for Soft affinity, it should be considered as last
 	config := cluster.BuildContainerConfig(dockerclient.ContainerConfig{Env: []string{"affinity:image==~image-0:tag3"}})
-	result, err = ApplyFilters(filters, config, nodes)
+	result, err = ApplyFilters(filters, config, nodes, true)
+	assert.Error(t, err)
+	assert.Len(t, result, 0)
+	result, err = ApplyFilters(filters, config, nodes, false)
 	assert.NoError(t, err)
 	assert.Len(t, result, 1)
 

@@ -26,6 +26,22 @@ function teardown() {
 	[[ "${output}" == *"cannot specify 64-byte hexadecimal strings"* ]]
 }
 
+@test "docker run with image digest" {
+	start_docker 2
+	swarm_manage
+
+	docker_swarm pull jimmyxian/busybox@sha256:649374debd26307573564fcf9748d39db33ef61fbf88ee84c3af10fd7e08765d
+
+	# make sure no container exist
+	run docker_swarm ps -qa
+	[ "${#lines[@]}" -eq 0 ]
+
+	docker_swarm run -d --name test_container jimmyxian/busybox@sha256:649374debd26307573564fcf9748d39db33ef61fbf88ee84c3af10fd7e08765d sleep 100
+
+	# verify, container is running
+	[ -n $(docker_swarm ps -q --filter=name=test_container --filter=status=running) ]
+}
+
 @test "docker run with resources" {
 	start_docker_with_busybox 2
 	swarm_manage
@@ -43,8 +59,8 @@ function teardown() {
 			 --pid=host \
 			 --memory-swappiness=2 \
 			 --group-add="root" \
-			 --memory-reservation=100 \
-			 --kernel-memory=100 \
+			 --memory-reservation=100M \
+			 --kernel-memory=100M \
 			 --dns-opt="someDnsOption" \
 			 --stop-signal="SIGKILL" \
 			 busybox sleep 1000
@@ -76,16 +92,80 @@ function teardown() {
 	# group-add
 	[[ "${output}" == *"root"* ]]
 	# memory-reservation
-	[[ "${output}" == *"\"MemoryReservation\": 100"* ]]
+	[[ "${output}" == *"\"MemoryReservation\": 104857600"* ]]
 	# kernel-memory
-	[[ "${output}" == *"\"KernelMemory\": 100"* ]]
+	[[ "${output}" == *"\"KernelMemory\": 104857600"* ]]
 	# dns-opt
 	[[ "${output}" == *"someDnsOption"* ]]
 	# stop-signal
 	[[ "${output}" == *"\"StopSignal\": \"SIGKILL\""* ]]
+
+	# following options are introduced in docker 1.10, skip older version
+	run docker --version
+	if [[ "${output}" == "Docker version 1.9"* ]]; then
+		skip
+	fi
+
+	docker_swarm run -d --name test_container2 \
+			 --oom-score-adj=350 \
+			 --tmpfs=/tempfs:rw \
+			 --device-read-iops=/dev/null:351 \
+			 --device-write-iops=/dev/null:352 \
+			 --device-read-bps=/dev/null:1mb \
+			 --device-write-bps=/dev/null:2mb \
+			 busybox sleep 1000
+
+	run docker_swarm inspect test_container2
+	# oom-score-adj
+	[[ "${output}" == *"\"OomScoreAdj\": 350"* ]]
+	# tmpfs
+	[[ "${output}" == *"\"/tempfs\": \"rw\""* ]]
+	# device-read-iops
+	[[ "${output}" == *"351"* ]]
+	# device-write-iops
+	[[ "${output}" == *"352"* ]]
+	# device-read-bps
+	[[ "${output}" == *"1048576"* ]]
+	# device-write-bps
+	[[ "${output}" == *"2097152"* ]]
 }
 
-@test "docker run - reschedule with soft-image-affinity" {
+@test "docker run --ip" {
+	# docker run --ip is introduced in docker 1.10, skip older version without --ip
+	# look for --ip6 because --ip will match --ipc
+	run docker run --help
+	if [[ "${output}" != *"--ip6"* ]]; then
+		skip
+	fi
+
+	start_docker_with_busybox 1
+	swarm_manage
+
+	docker_swarm network create -d bridge --subnet 10.0.0.0/24 testn
+
+	docker_swarm run --name testc --net testn -d --ip 10.0.0.42 busybox sh
+	run docker_swarm inspect testc
+	[[ "${output}" == *"10.0.0.42"* ]]
+}
+
+@test "docker run --net-alias" {
+	# docker run --net-alias is introduced in docker 1.10, skip older version without --net-alias
+	run docker run --help
+	if [[ "${output}" != *"--net-alias"* ]]; then
+		skip
+	fi
+
+	start_docker_with_busybox 1
+	swarm_manage
+
+	docker_swarm network create -d bridge testn
+
+	docker_swarm run --name testc --net testn -d --net-alias=testa busybox sh
+	run docker_swarm inspect testc
+	[[ "${output}" == *"testa"* ]]
+}
+
+@test "docker run - reschedule with image affinity" {
 	start_docker_with_busybox 1
 	start_docker 1
 
@@ -99,15 +179,19 @@ function teardown() {
 
 	# try to create container on node-1, node-1 does not have busyboxabcde and will pull it
 	# but can not find busyboxabcde in dockerhub
-	# then will retry with soft-image-affinity
+	# then will retry with image affinity
 	docker_swarm run -d --name test_container -e constraint:node==~node-1 busyboxabcde sleep 1000
 
 	# check container running on node-0
 	run docker_swarm ps
 	[[ "${output}" == *"node-0/test_container"* ]]
+
+	# check the image affinity wasn't saved
+	run docker_swarm inspect test_container
+	[[ "${output}" != *"image==busyboxabcde"* ]]
 }
 
-@test "docker run - reschedule with soft-image-affinity(have node constraint))" {
+@test "docker run - reschedule with image affinity and node constraint" {
 	start_docker_with_busybox 1
 	start_docker 1
 
@@ -125,8 +209,28 @@ function teardown() {
 	run docker_swarm run -d --name test_container -e constraint:node==node-1 busyboxabcde sleep 1000
 
 	# check error message
-	[[ "${output}" != *"unable to find a node that satisfies"* ]]
-	[[ "${output}" == *"busyboxabcde:latest not found"* ]]
+	[[ "${output}" != *"unable to find a node that satisfies the constraint"* ]]
+	[[ "${output}" == *"not found"* ]]
+}
+
+@test "docker run - constraint and soft affinities" {
+	start_docker_with_busybox 1 --label group=A
+	start_docker_with_busybox 1 --label group=B
+	swarm_manage
+
+	# start c0 on a node in group=A
+	docker_swarm run -d --name c0 -e constraint:group==A -e affinity:container==~c0 busybox sleep 100
+
+	# check container running on node-0
+	run docker_swarm ps
+	[[ "${output}" == *"node-0/c0"* ]]
+
+	# start c2 on a node in group==B (soft affinity shouldn't matter here)
+	docker_swarm run -d --name c2 -e constraint:group==B -e affinity:container==~c0 busybox sleep 100
+
+	# check container running on a node in group=B
+	run docker_swarm ps
+	[[ "${output}" == *"node-1/c2"* ]]
 }
 
 @test "docker run - with not exist volume driver" {
@@ -142,5 +246,5 @@ function teardown() {
 
 	# check error message
 	[ "$status" -ne 0 ]
-	[[ "${output}" == *"Plugin not found"* ]]
+	[[ "${output,,}" == *"plugin not found"* ]]
 }
