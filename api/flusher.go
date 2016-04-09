@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+    "fmt"
 
 	"github.com/docker/docker/pkg/ioutils"
 )
@@ -38,6 +39,7 @@ func NewWriteFlusher(w io.Writer) *WriteFlusher {
 		flusher = f
 	} else {
 		flusher = &ioutils.NopFlusher{}
+        fmt.Println("not flusher")
 	}
 	return &WriteFlusher{w: w, flusher: flusher}
 }

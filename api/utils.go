@@ -97,6 +97,7 @@ func closeIdleConnections(client *http.Client) {
 }
 
 func proxyAsync(tlsConfig *tls.Config, addr string, w http.ResponseWriter, r *http.Request, callback func(*http.Response)) error {
+
 	// Use a new client for each request
 	client, scheme := newClientAndScheme(tlsConfig)
 	// RequestURI may not be sent to client
@@ -104,6 +105,49 @@ func proxyAsync(tlsConfig *tls.Config, addr string, w http.ResponseWriter, r *ht
 
 	r.URL.Scheme = scheme
 	r.URL.Host = addr
+    
+	var resp *http.Response
+
+	var writeComplete = make(chan bool)
+    var dectedComplete=make(chan bool)
+
+	go func() {
+		var (
+			closeNotifier http.CloseNotifier
+			ok            bool
+		)
+
+		if closeNotifier, ok = w.(http.CloseNotifier); ok == false {
+			log.Error("it was not a close notifier !", addr)
+			return
+		}
+
+		select {
+		case <-closeNotifier.CloseNotify():
+			{
+				//fmt.Println("dected closed...")
+				if client.Transport == nil {
+					tr, _ := http.DefaultTransport.(*http.Transport)
+                    tr.CancelRequest(r)
+                    
+				} else {
+					if tr2, ok := client.Transport.(*http.Transport); ok == true {
+						tr2.CancelRequest(r)
+					} else {
+						log.Error("not http.Transport")
+					}
+				}
+                
+                dectedComplete <-true //告知检测结束
+			}
+		case <-writeComplete:
+			{
+				break
+			}
+		}
+        
+        //log.Info("out goroutine")
+	}()
 
 	log.WithFields(log.Fields{"method": r.Method, "url": r.URL}).Debug("Proxy request")
 	resp, err := client.Do(r)
@@ -113,12 +157,23 @@ func proxyAsync(tlsConfig *tls.Config, addr string, w http.ResponseWriter, r *ht
 
 	copyHeader(w.Header(), resp.Header)
 	w.WriteHeader(resp.StatusCode)
-	io.Copy(NewWriteFlusher(w), resp.Body)
+	_, err= io.Copy(NewWriteFlusher(w), resp.Body)
+    if err!=nil{
+        log.Error("copy error ",err.Error())
+    }
 
 	if callback != nil {
 		callback(resp)
 	}
 
+    //goroutine
+    select{
+        case <-dectedComplete:
+            break 
+        case writeComplete <- true ://如果dected goroutine 未结束,发结束信号
+            break
+    }
+	
 	// cleanup
 	resp.Body.Close()
 	closeIdleConnections(client)
@@ -129,6 +184,8 @@ func proxyAsync(tlsConfig *tls.Config, addr string, w http.ResponseWriter, r *ht
 func proxy(tlsConfig *tls.Config, addr string, w http.ResponseWriter, r *http.Request) error {
 	return proxyAsync(tlsConfig, addr, w, r, nil)
 }
+
+
 
 func hijack(tlsConfig *tls.Config, addr string, w http.ResponseWriter, r *http.Request) error {
 	if parts := strings.SplitN(addr, "://", 2); len(parts) == 2 {
