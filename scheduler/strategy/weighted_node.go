@@ -11,7 +11,7 @@ import (
 type weightedNode struct {
 	Node *node.Node
 	// Weight is the inherent value of this node.
-	Weight      int64
+	Weight      int64 //这个是最终算出来的分值
 	memoryScore int64
 	cpuScore    int64
 }
@@ -41,8 +41,12 @@ func (n weightedNodeList) Less(i, j int) bool {
 	)
 
 	// If the nodes have the same weight sort them out by number of containers.
-	if ip.Weight == jp.Weight {
-		return len(ip.Node.Containers) < len(jp.Node.Containers)
+	if ip.Weight == jp.Weight {//打分相同
+        
+        if  ip.Node.JoinWeight == jp.Node.JoinWeight{
+            return len(ip.Node.Containers) < len(jp.Node.Containers)
+        }
+        return ip.Node.JoinWeight > jp.Node.JoinWeight//如果打分相同,主机本身权重不同,则权重大的优先排前边
 	}
 	return ip.Weight < jp.Weight
 }

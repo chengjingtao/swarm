@@ -118,3 +118,53 @@ func TestEntriesDiff(t *testing.T) {
 	assert.Len(t, removed, 1)
 	assert.True(t, removed.Contains(entry2))
 }
+
+func TestGetHostAndPortAndWeight(t *testing.T){
+    host,port,weight,err := getHostAndPortAndWeight("192.168.5.55:2375")
+    if host !="192.168.5.55" && port!="2375" && weight!=defaultWeight{
+        t.Error("wrong when 192.168.5.55:2375")
+    }
+    if err!=nil{
+        t.Error("wrong when 192.168.5.55:2375")
+    }
+    
+    host,port,weight,err = getHostAndPortAndWeight("192.168.5.55:2375/weight")
+    if host!="192.168.5.55" && port!="2375" && weight!=defaultWeight{
+        t.Error("wrong when 192.168.5.55:2375/weight")
+    }
+    if err!=nil{
+        t.Error("wrong when 192.168.5.55:2375")
+    }
+    
+    host,port,weight,err = getHostAndPortAndWeight("192.168.5.55:2375/weight/")
+    if host!="192.168.5.55" && port!="2375" && weight!=defaultWeight{
+        t.Error("wrong when 192.168.5.55:2375/weight/")
+    }
+    if err!=nil{
+        t.Error("wrong when 192.168.5.55:2375")
+    }
+    
+    host,port,weight,err = getHostAndPortAndWeight("192.168.5.55:2375/weight/1")
+    if host!="192.168.5.55" && port!="2375" && weight!=1{
+        t.Error("wrong when 192.168.5.55:2375/weight/1")
+    }
+    if err!=nil{
+        t.Error("wrong when 192.168.5.55:2375")
+    }    
+    
+    host,port,weight,err = getHostAndPortAndWeight("192.168.5.55:2375/weight/2")
+    if host!="192.168.5.55" && port!="2375" && weight!=2{
+        t.Error("wrong when 192.168.5.55:2375/weight/2")
+    }
+    if err!=nil{
+        t.Error("wrong when 192.168.5.55:2375")
+    }
+    
+    host,port,weight,err = getHostAndPortAndWeight("192.168.5.55:2375/weight/xx")
+    if host!="192.168.5.55" && port!="2375" && weight!=defaultWeight{
+        t.Error("wrong when 192.168.5.55:2375/weight/xx")
+    }
+    if err!=nil{
+        t.Error("wrong when 192.168.5.55:2375")
+    }
+}

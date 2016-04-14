@@ -13,6 +13,10 @@ import (
 
 var (
 	NoHaveCustomNodes = errors.New("常备节点为空,无法调度.")
+
+	WeightBack       = -1
+	WeightWillRemove = 0
+	//>1 为正常权重
 )
 
 // SpreadPlacementStrategy places a container on the node with the fewest running containers.
@@ -31,7 +35,8 @@ func (p *DynamicSpreadPlacementStrategy) Name() string {
 
 // RankAndSort sorts nodes based on the spread strategy applied to the container config.
 func (p *DynamicSpreadPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error) {
-	weightedList, err := weighAllNodes(config, nodes)
+	_weightedList, err := weighAllNodes(config, nodes)
+    var weightedList =removeThatTagWillRemoved(_weightedList) //移除那些已经标记为删除的
 
 	if err != nil {
 		return nil, err
@@ -56,6 +61,7 @@ func (p *DynamicSpreadPlacementStrategy) RankAndSort(config *cluster.ContainerCo
 			cpuLoadBk += item.CpuLoad()
 
 		} else { //not back up list
+
 			notBackupNodeList = append(notBackupNodeList, item)
 
 			memoryLoad += item.MemoryLoad()
@@ -96,9 +102,9 @@ func (p *DynamicSpreadPlacementStrategy) RankAndSort(config *cluster.ContainerCo
 			eventemitter.Emit("/cluster/resources/over", []interface{}{msg, getNodes(weightedList)})
 		}
 
-		//常备服务器中无资源尚有资源可用 优先使用常备服务器
+		//常备服务器中尚有资源可用 优先使用常备服务器
 		if len(noOverInNotBkList) > 0 {
-			return getNodes(noOverInNotBkList), nil
+			return getNodes(notBackupNodeList), nil
 		}
 
 		//常备服务器中无资源可用,则在所有服务器中挑出 排名靠前者
@@ -113,4 +119,19 @@ func getNodes(wNodes weightedNodeList) []*node.Node {
 	}
 
 	return nodes
+}
+
+func removeThatTagWillRemoved(_weightedList weightedNodeList)weightedNodeList{
+    var list weightedNodeList 
+    
+	for _, item := range _weightedList {
+		if item.Node.JoinWeight == WeightWillRemove {
+			log.Debugf("%s 标记为撤出,已跳过", item.Node.Addr)
+			continue
+		}
+        
+        list=append(list,item)
+	}
+    
+    return list
 }

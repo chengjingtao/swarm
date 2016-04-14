@@ -51,8 +51,11 @@ func TestRankAndSort(t *testing.T) {
 	var d = &DynamicSpreadPlacementStrategy{}
 
 	var node1 = createNode("001", 4, 4)
+    node1.JoinWeight=1
 	var node2 = createNode("002", 4, 4)
+    node2.JoinWeight=1
 	var node3 = createNode("003", 4, 4)
+    node3.JoinWeight=1
 
 	var nodes = []*node.Node{
 		node1, node2, node3,
@@ -160,6 +163,51 @@ func TestRankAndSort(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, getNodes[0].ID, "001") //node1
 	assert.Equal(t, getNodes[1].ID, "003") //node3
+    
+    
+    node1.JoinWeight=0//node1标记为退出集群
+    getNodes,err= d.RankAndSort(config256,nodes)
+    assert.NoError(t,err)
+    assert.Equal(t,getNodes[0].ID,"003")
+    assert.Equal(t,getNodes[1].ID,"002")
+    assert.Equal(t, node3.UsedMemory, int64(2.5*1024*1024*1024))
+    assert.Equal(t, node2.UsedMemory, int64(4*1024*1024*1024))
+    assert.Equal(t,len(getNodes),2)//常备节点有可用资源,只剩下两个
+    
+    node3.AddContainer(createContainer("c17",config1024)) // node2上加了一个1G //2.5+0.5=3.5
+    getNodes,err= d.RankAndSort(config256,nodes)
+    assert.NoError(t,err)
+    assert.Equal(t,getNodes[0].ID,"003")
+    assert.Equal(t,getNodes[1].ID,"002")
+    assert.Equal(t, node3.UsedMemory, int64(3.5*1024*1024*1024))
+    assert.Equal(t, node2.UsedMemory, int64(4*1024*1024*1024))
+    assert.Equal(t,len(getNodes),2)
+    
+    node3.JoinWeight=3
+    node2.RemoveContainer("c8")//3.5G 此时node2 和node3 占用内存相同,使用权重比较 node3胜出
+    node2.JoinWeight=1
+    
+    getNodes,err= d.RankAndSort(config256,nodes)
+    assert.NoError(t,err)
+    assert.Equal(t,getNodes[0].ID,"003")
+    assert.Equal(t, node2.UsedMemory, int64(3.5*1024*1024*1024))
+    assert.Equal(t, node3.UsedMemory, int64(3.5*1024*1024*1024))
+    assert.Equal(t,getNodes[1].ID,"002")
+    assert.Equal(t,len(getNodes),2)
+    
+    assert.Equal(t, bknode2.UsedMemory, int64(0.5*1024*1024*1024))
+    getNodes,err= d.RankAndSort(config1024,nodes) //加1G 常备节点超过,在所有集群中使用bknode2
+    assert.Equal(t,getNodes[0].ID,"005")
+    assert.Equal(t, bknode2.UsedMemory, int64(0.5*1024*1024*1024))
+    assert.Equal(t,getNodes[1].ID,"003")
+    assert.Equal(t, node3.UsedMemory, int64(3.5*1024*1024*1024))
+    assert.Equal(t,getNodes[2].ID,"002")
+    assert.Equal(t, node2.UsedMemory, int64(3.5*1024*1024*1024))
+    assert.Equal(t,getNodes[3].ID,"004")
+    assert.Equal(t, bknode1.UsedMemory, int64(4*1024*1024*1024))
+    assert.Equal(t,len(getNodes),4)
+    
+    
 	log.Info("延迟2s后退出...")
 	time.Sleep(2 * time.Second)
 }

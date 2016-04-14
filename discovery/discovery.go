@@ -13,10 +13,17 @@ import (
 
 // An Entry represents a swarm host.
 type Entry struct {
-	Host   string
-	Port   string
+	Host string
+	Port string
+
+	// -1 表示 备用机器
+	// 0 表示 标记为退出集群(将不再使用向该机器上分配资源)
+	// 1 默认值为1 表示默认权重
+	// 其他整数值 表示分配权重
 	Weight int
 }
+
+const defaultWeight = 1
 
 // NewEntry creates a new entry.
 func NewEntry(url string) (*Entry, error) {
@@ -27,13 +34,14 @@ func NewEntry(url string) (*Entry, error) {
 	//		return nil, err
 	//	}
 	var host, port, w, err = getHostAndPortAndWeight(url)
-	//log.Debugf("NewEntry() host is %s ,port is %s", host, port)
+
 	if err != nil {
 		return nil, err
 	}
 	return &Entry{host, port, w}, nil
 }
 
+//url = 192.168.5.55:2375/weight/1
 func getHostAndPortAndWeight(url string) (host string, port string, w int, ers error) {
 	var segments = strings.Split(url, "/")
 	var index = -1
@@ -48,20 +56,33 @@ func getHostAndPortAndWeight(url string) (host string, port string, w int, ers e
 	host, port, err := net.SplitHostPort(hostAndPort)
 
 	if err != nil {
-		return "", "", 0, err
+		log.Warnf("%s weight 值为空, 使用默认值 %d", url, defaultWeight)
+		return "", "", defaultWeight, err
 	}
 
 	if index == -1 {
-		return host, port, 0, nil
+		return host, port, defaultWeight, nil
+	}
+
+	if len(segments) == index+1 {
+		log.Warnf("%s  weight 无值, 使用默认值 %d", url, defaultWeight)
+		return host, port, defaultWeight, nil
 	}
 
 	var value = segments[index+1]
-	v, err := strconv.Atoi(value)
-	if err != nil {
-		log.Warn("weight 值有无, 将使用默认值0")
-		return host, port, 0, nil
+	value = strings.TrimSpace(value)
+	if value == "" {
+		log.Warnf("%s  weight 值为空, 使用默认值 %d", url, defaultWeight)
+		return host, port, defaultWeight, nil
 	}
 
+	v, err := strconv.Atoi(value)
+	if err != nil {
+		log.Warnf("%s weight 值有误, 使用默认值 %d", url, defaultWeight)
+		return host, port, defaultWeight, nil
+	}
+
+	log.Infof("%s  weight 值为 %d", url, v)
 	return host, port, v, nil
 }
 
