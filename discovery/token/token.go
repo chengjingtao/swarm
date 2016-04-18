@@ -129,6 +129,11 @@ func (s *Discovery) Register(addr string) error {
 	return nil
 }
 
+// RegisterWithData is exported
+func (s *Discovery) RegisterWithData(addr string,data map[string]string) error {
+	return discovery.ErrNotImplemented
+}
+
 // CreateCluster returns a unique cluster token
 func (s *Discovery) CreateCluster() (string, error) {
 	resp, err := http.Post(fmt.Sprintf("%s/%s", s.url, "clusters"), "", nil)

@@ -3,9 +3,12 @@ package cli
 import (
 	"os"
 	"regexp"
+    "io/ioutil"
 	"time"
-
+    URL "net/url"
+    "os/exec"
 	"strings"
+    "path/filepath"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
@@ -13,11 +16,11 @@ import (
 )
 
 func checkAddrFormat(addr string) bool {
-	m, _ := regexp.MatchString("^[0-9a-zA-Z._-]+:[0-9]{1,5}$", addr)
+	m, _ := regexp.MatchString("^[0-9a-zA-Z._-]+:[0-9]{1,5}", addr)
 	return m
 }
 
-//join  --addr 172.16.150.11:2375 --weight -1    172.16.150.11:2375/weight/-1
+//join  --addr 172.16.150.11:2375 172.16.150.11:2375?weight=1
 //join  --addr 172.16.150.11:2375
 
 func join(c *cli.Context) {
@@ -53,12 +56,15 @@ func join(c *cli.Context) {
 	if err != nil {
 		log.Fatal(err)
 	}
+    
+    var url=addr
+    var nodeAddr = trueAddr(url)
 
 	for {
-        var refreshedAddr = refreshURL(addr)
-		log.WithFields(log.Fields{"addr": refreshedAddr, "discovery": dflag}).Infof("Registering on the discovery service every %s...", hb)
+        var data=refreshData(url)
+		log.WithFields(log.Fields{"addr": nodeAddr, "discovery": dflag}).Infof("Registering on the discovery service every %s...", hb)
 
-		if err := d.Register(refreshedAddr); err != nil {
+		if err := d.RegisterWithData(nodeAddr,data); err != nil {
 			log.Error(err)
 		}
 
@@ -66,44 +72,79 @@ func join(c *cli.Context) {
 	}
 }
 
-//如果环境变量有值,则以环境变量为准
-//如果环境变量没值,则以加入时的状态为准
-func refreshURL(joinedUrl string) string {
-	var envValue = strings.TrimSpace(os.Getenv("SWARM_JOIN_WEIGHT"))
+func trueAddr(url string) string{
 
-	if envValue != "" {
-		return appendWeightValue(joinedUrl, envValue)
-	}
-
-	return joinedUrl
+    u,_ := URL.Parse("http://"+url)
+    
+    return u.Host
 }
 
-func appendWeightValue(url string, value string) string {
-
-	if strings.Index(url, "/weight/") == -1 {
-
-		if !strings.HasSuffix(url, "/") {
-			url = url + "/"
-		}
-
-		if !strings.HasSuffix(url, "weight/") {
-			url = url + "weight/"
-		}
-
-		url = url + value
-		return url
+//refreshData 如果环境变量有值,则以环境变量为准
+//如果环境变量没值,则以加入时的状态为准
+func refreshData(joinedUrl string) map[string]string {
+	var setValue = strings.TrimSpace(weight())
+    u,_ := URL.Parse("http://"+joinedUrl)
+    var query=u.Query()
+    
+	if setValue != "" {
+        query.Set("weight",setValue)
+		return parseValuesToData(query)
 	}
 
-	var segments = strings.Split(url, "/")
-	var index = -1
+	return parseValuesToData(query)
+}
 
-	for i, item := range segments {
-		if item == "weight" {
-			index = i
-			break
-		}
-	}
+func parseValuesToData(vs URL.Values) map[string]string {
+    
+    var data=map[string]string{}
+    for k,v :=range vs{
+        data[k]=v[0]
+    }
+    return data
+}
 
-	segments[index+1]=value
-    return strings.Join(segments,"/")
+func setWeightValue(url string, value string) string {
+
+    u,_ := URL.Parse("http://"+url)
+    var query = u.Query()
+    query.Set("weight",value)
+    
+    var res = u.Host+"?"+query.Encode()
+    return res
+}
+
+func weight() string{
+    p,err := exec.LookPath(os.Args[0])
+    if err!=nil{
+       log.Error("LookPath error ",err)
+       os.Exit(1) 
+    }
+    absPath,err := filepath.Abs(p)
+    if err!=nil{
+       log.Errorf("Abs path-> %s error  %s",p, err.Error())
+       os.Exit(1)
+    }
+    
+    segments := strings.Split(absPath,"/")
+    segments[len(segments)-1]="join-weight"
+    path := strings.Join(segments,"/")
+    
+    f,err := os.Open(path)
+    if err!=nil{
+        if os.IsNotExist(err){
+            if f,err = os.OpenFile(path,os.O_CREATE,0666);err!=nil{
+                log.Error("创建.join-weight 失败",err)
+                return ""   
+            }
+        }else{
+            log.Error(".join-weight Open失败",err)
+            return ""
+        }
+    }
+    
+    if bts,err := ioutil.ReadAll(f);err==nil{
+        return string(bts)
+    }
+    log.Error(".join-weight read error ",err.Error())
+    return ""
 }

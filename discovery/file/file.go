@@ -108,6 +108,7 @@ func (s *Discovery) Register(addr string) error {
 	return discovery.ErrNotImplemented
 }
 
-func (s *Discovery) RegsiterB(addr string, isBk bool) error {
+// RegisterWithData is exported
+func (s *Discovery) RegisterWithData(addr string,data map[string]string) error {
 	return discovery.ErrNotImplemented
 }

@@ -208,6 +208,19 @@ func (c *Cluster) hasEngineByAddr(addr string) bool {
 	return c.getEngineByAddr(addr) != nil
 }
 
+func (c *Cluster) updateEngine(addr string,weight int){
+	c.Lock()
+	defer c.Unlock()
+
+	for _, engine := range c.engines {
+		if engine.Addr == addr {
+            log.Infof("update the engine %s ,weight=%d",addr,weight)
+			engine.Weight=weight
+		}
+	}
+	return
+}
+
 //add engine to cluster with weight
 func (c *Cluster) addEngineW(addr string, weight int) bool {
 	log.Debugf("addEngine(%s,%d)", addr, weight)
@@ -312,7 +325,7 @@ func (c *Cluster) monitorDiscovery(ch <-chan discovery.Entries, errCh <-chan err
 	for {
 		select {
 		case entries := <-ch:
-			added, removed := currentEntries.Diff(entries)
+			added, removed,updated := currentEntries.Diff(entries)
 			currentEntries = entries
 
 			// Remove engines first. `addEngine` will refuse to add an engine
@@ -321,6 +334,10 @@ func (c *Cluster) monitorDiscovery(ch <-chan discovery.Entries, errCh <-chan err
 			for _, entry := range removed {
 				c.removeEngine(entry.String())
 			}
+            
+            for _,entry :=range updated{
+                c.updateEngine(entry.String(),entry.Weight)
+            }
 
 			// Since `addEngine` can be very slow (it has to connect to the
 			// engine), we are going to do the adds in parallel.
@@ -778,7 +795,7 @@ func (c *Cluster) Info() [][]string {
 	sort.Sort(cluster.EngineSorter(engines))
 
 	for _, engine := range engines {
-		info = append(info, []string{engine.Name, engine.Addr})
+		info = append(info, []string{engine.Name, engine.Addr,fmt.Sprintf("%d",engine.Weight)})
 		info = append(info, []string{" └ Containers", fmt.Sprintf("%d", len(engine.Containers()))})
 		total, start := engine.ContainersTotalAndStart()
 		info = append(info, []string{" └ Containers Total And Start", fmt.Sprintf("%d / %d", len(start), len(total))})

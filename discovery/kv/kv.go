@@ -175,6 +175,24 @@ func (s *Discovery) Register(addr string) error {
 	return s.store.Put(path.Join(s.path, addr), []byte(addr), opts)
 }
 
+// RegisterWithData is exported
+func (s *Discovery) RegisterWithData(addr string,data map[string]string) error {
+	opts := &store.WriteOptions{TTL: s.ttl}
+    var q=""
+    var i=0
+    for k,v:=range data{
+        i++
+        if i==1{
+            q+=k+"="+v
+        }else{
+            q+="&"+k+"="+v
+        }
+    }
+    var addrQ=addr+"?"+q
+    log.Info("register with data ->"+addrQ)
+	return s.store.Put(path.Join(s.path, addr), []byte(addrQ), opts)
+}
+
 // Store returns the underlying store used by KV discovery.
 func (s *Discovery) Store() store.Store {
 	return s.store

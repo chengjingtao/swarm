@@ -128,7 +128,7 @@ func TestGetHostAndPortAndWeight(t *testing.T){
         t.Error("wrong when 192.168.5.55:2375")
     }
     
-    host,port,weight,err = getHostAndPortAndWeight("192.168.5.55:2375/weight")
+    host,port,weight,err = getHostAndPortAndWeight("192.168.5.55:2375?weight")
     if host!="192.168.5.55" && port!="2375" && weight!=defaultWeight{
         t.Error("wrong when 192.168.5.55:2375/weight")
     }
@@ -136,7 +136,7 @@ func TestGetHostAndPortAndWeight(t *testing.T){
         t.Error("wrong when 192.168.5.55:2375")
     }
     
-    host,port,weight,err = getHostAndPortAndWeight("192.168.5.55:2375/weight/")
+    host,port,weight,err = getHostAndPortAndWeight("192.168.5.55:2375?weight=")
     if host!="192.168.5.55" && port!="2375" && weight!=defaultWeight{
         t.Error("wrong when 192.168.5.55:2375/weight/")
     }
@@ -144,7 +144,7 @@ func TestGetHostAndPortAndWeight(t *testing.T){
         t.Error("wrong when 192.168.5.55:2375")
     }
     
-    host,port,weight,err = getHostAndPortAndWeight("192.168.5.55:2375/weight/1")
+    host,port,weight,err = getHostAndPortAndWeight("192.168.5.55:2375?weight=1")
     if host!="192.168.5.55" && port!="2375" && weight!=1{
         t.Error("wrong when 192.168.5.55:2375/weight/1")
     }
@@ -152,7 +152,7 @@ func TestGetHostAndPortAndWeight(t *testing.T){
         t.Error("wrong when 192.168.5.55:2375")
     }    
     
-    host,port,weight,err = getHostAndPortAndWeight("192.168.5.55:2375/weight/2")
+    host,port,weight,err = getHostAndPortAndWeight("192.168.5.55:2375?weight=2")
     if host!="192.168.5.55" && port!="2375" && weight!=2{
         t.Error("wrong when 192.168.5.55:2375/weight/2")
     }
@@ -160,7 +160,7 @@ func TestGetHostAndPortAndWeight(t *testing.T){
         t.Error("wrong when 192.168.5.55:2375")
     }
     
-    host,port,weight,err = getHostAndPortAndWeight("192.168.5.55:2375/weight/xx")
+    host,port,weight,err = getHostAndPortAndWeight("192.168.5.55:2375?weight=xx")
     if host!="192.168.5.55" && port!="2375" && weight!=defaultWeight{
         t.Error("wrong when 192.168.5.55:2375/weight/xx")
     }

@@ -25,13 +25,13 @@ func Init() {
 // Initialize is exported
 func (s *Discovery) Initialize(uris string, _ time.Duration, _ time.Duration, _ map[string]string) error {
 	for _, input := range strings.Split(uris, ",") {
-		for _, ip := range discovery.Generate(input) {
-			entry, err := discovery.NewEntry(ip)
+		//for _, ip := range discovery.Generate(input) {
+			entry, err := discovery.NewEntry(input)
 			if err != nil {
 				return fmt.Errorf("%s, please check you are using the correct discovery (missing token:// ?)", err.Error())
 			}
 			s.entries = append(s.entries, entry)
-		}
+		//}
 	}
 
 	return nil
@@ -52,6 +52,12 @@ func (s *Discovery) Watch(stopCh <-chan struct{}) (<-chan discovery.Entries, <-c
 func (s *Discovery) Register(addr string) error {
 	return discovery.ErrNotImplemented
 }
+
+// Register is exported
+func (s *Discovery) RegisterWithData(addr string,data map[string]string) error {
+	return discovery.ErrNotImplemented
+}
+
 
 func (s *Discovery) RegisterEntry(addr string) error {
 	return discovery.ErrNotImplemented

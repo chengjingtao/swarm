@@ -203,7 +203,7 @@ func follow(follower *leadership.Follower, replica *api.Replica, addr string) {
 }
 
 func manage(c *cli.Context) {
-	var (
+    var (
 		tlsConfig *tls.Config
 		err       error
 	)
@@ -236,7 +236,9 @@ func manage(c *cli.Context) {
 	if uri == "" {
 		log.Fatalf("discovery required to manage a cluster. See '%s manage --help'.", c.App.Name)
 	}
+    
 	discovery := createDiscovery(uri, c, c.StringSlice("discovery-opt"))
+    
 	s, err := strategy.New(c.String("strategy"))
 	if err != nil {
 		log.Fatal(err)
