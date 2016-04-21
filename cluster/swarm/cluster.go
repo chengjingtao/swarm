@@ -785,6 +785,7 @@ func (c *Cluster) TotalCpus() int64 {
 
 // Info returns some info about the cluster, like nb or containers / images
 func (c *Cluster) Info() [][]string {
+    log.Info("in Info")
 	info := [][]string{
 		{"\bStrategy", c.scheduler.Strategy()},
 		{"\bFilters", c.scheduler.Filters()},
@@ -793,7 +794,7 @@ func (c *Cluster) Info() [][]string {
 
 	engines := c.listEngines()
 	sort.Sort(cluster.EngineSorter(engines))
-
+    log.Info("range engines")
 	for _, engine := range engines {
 		info = append(info, []string{engine.Name, engine.Addr,fmt.Sprintf("%d",engine.Weight)})
 		info = append(info, []string{" └ Containers", fmt.Sprintf("%d", len(engine.Containers()))})
@@ -810,7 +811,7 @@ func (c *Cluster) Info() [][]string {
 		sort.Strings(labels)
 		info = append(info, []string{" └ Labels", fmt.Sprintf("%s", strings.Join(labels, ", "))})
 	}
-
+    log.Info("out info")
 	return info
 }
 
