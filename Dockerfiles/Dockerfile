@@ -1,7 +1,7 @@
-FROM ubuntu
-
+FROM ubuntu:14.04
 COPY ./swarm /swarm
-#COPY ./certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+#https相关的会用到
+COPY ./certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY ./tmp /tmp
 
 ENV SWARM_HOST :2375
@@ -9,7 +9,7 @@ EXPOSE 2375
 
 VOLUME /.swarm
 VOLUME /config.json
-
+ENV TZ Asia/Shanghai
 ENTRYPOINT ["/swarm"]
 CMD ["--help"]
 
